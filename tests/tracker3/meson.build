@@ -14,6 +14,11 @@ foreach t: source_tests
             '-DTRACKER3_DATA_PATH="@0@"'.format(datadir),
         ])
     test(t, tracker_sandbox,
+	env: [
+	   'TRACKER_DEBUG=tests',
+	   'G_MESSAGES_DEBUG=all',
+	   'LANG=C.UTF-8'
+	],
         args: [
 	    '--index-recursive-directories', datadir,
  	    '--store-tmpdir',
