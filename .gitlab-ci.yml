@@ -7,47 +7,64 @@ variables:
                       meson redhat-rpm-config gcc gcc-c++ glibc-devel git vala
                       gtk-doc
 
-  DEPENDENCIES: sqlite-devel libgcrypt-devel itstool lua-devel
-                libsoup-devel gperf libarchive-devel json-glib-devel
-                avahi-gobject-devel totem-pl-parser-devel rest-devel
-                tracker-devel libdmapsharing-devel libmediaart-devel
-                gom-devel gnome-online-accounts-devel libgdata-devel
-                gstreamer1-plugins-good gstreamer1-plugins-bad-free-extras
+.Dependencies procedure: &dependencies_procedure
+  rm -rf _build/ &&
+  dnf update -y --nogpgcheck &&
+  dnf install -y --nogpgcheck $DEPENDENCIES_GRILO $DEPENDENCIES
 
-build_stable:
+
+.Build procedure: &build_procedure
+  # As part of configuring grilo-plugins.git for build, the latest code from
+  # grilo.git will be fetched by Meson and it will be built as a subproject.
+  meson . _build --prefix=/usr ${BUILD_OPTS} &&
+  ninja -C _build &&
+  ninja -C _build install &&
+  meson test -C _build --suite=grilo-plugins
+
+build_tracker2:
+  stage: build
+  variables:
+    BUILD_OPTS: "-Denable-bookmarks=yes -Denable-chromaprint=yes -Denable-dleyna=yes -Denable-dmap=yes -Denable-filesystem=yes -Denable-flickr=yes -Denable-freebox=yes -Denable-gravatar=yes -Denable-jamendo=yes -Denable-local-metadata=yes -Denable-lua-factory=yes -Denable-magnatune=yes -Denable-metadata-store=yes -Denable-opensubtitles=yes -Denable-optical-media=yes -Denable-podcasts=yes -Denable-raitv=yes -Denable-shoutcast=yes -Denable-thetvdb=yes -Denable-tmdb=yes -Denable-tracker=yes -Denable-tracker3=no -Denable-vimeo=yes -Denable-youtube=yes"
+    DEPENDENCIES: sqlite-devel libgcrypt-devel itstool lua-devel
+                  libsoup-devel gperf libarchive-devel json-glib-devel
+                  avahi-gobject-devel totem-pl-parser-devel rest-devel
+                  tracker-devel libdmapsharing-devel libmediaart-devel
+                  gom-devel gnome-online-accounts-devel libgdata-devel
+                  gstreamer1-plugins-good gstreamer1-plugins-bad-free-extras
   before_script:
-    - dnf update -y --nogpgcheck
+    - *dependencies_procedure
   script:
-    - dnf install -y --nogpgcheck $DEPENDENCIES_GRILO $DEPENDENCIES
-    # As part of configuring grilo-plugins.git for build, the latest code from
-    # grilo.git will be fetched by Meson and it will be built as a subproject.
-    - meson . _build --prefix=/usr
-      -Denable-bookmarks=yes
-      -Denable-chromaprint=yes
-      -Denable-dleyna=yes
-      -Denable-dmap=yes
-      -Denable-filesystem=yes
-      -Denable-flickr=yes
-      -Denable-freebox=yes
-      -Denable-gravatar=yes
-      -Denable-jamendo=yes
-      -Denable-local-metadata=yes
-      -Denable-lua-factory=yes
-      -Denable-magnatune=yes
-      -Denable-metadata-store=yes
-      -Denable-opensubtitles=yes
-      -Denable-optical-media=yes
-      -Denable-podcasts=yes
-      -Denable-raitv=yes
-      -Denable-shoutcast=yes
-      -Denable-thetvdb=yes
-      -Denable-tmdb=yes
-      -Denable-tracker=yes
-      -Denable-vimeo=yes
-      -Denable-youtube=yes
+    - *build_procedure
+  artifacts:
+    name: meson-logs
+    when: on_failure
+    paths:
+      - _build/meson-logs
+
+build_tracker3:
+  stage: build
+  variables:
+    BUILD_OPTS: "-Denable-bookmarks=no -Denable-chromaprint=no -Denable-dleyna=no -Denable-dmap=no -Denable-filesystem=no -Denable-flickr=no -Denable-freebox=no -Denable-gravatar=no -Denable-jamendo=no -Denable-local-metadata=no -Denable-lua-factory=no -Denable-magnatune=no -Denable-metadata-store=no -Denable-opensubtitles=no -Denable-optical-media=no -Denable-podcasts=no -Denable-raitv=no -Denable-shoutcast=no -Denable-thetvdb=no -Denable-tmdb=no -Denable-tracker=no -Denable-tracker3=yes -Denable-vimeo=no -Denable-youtube=no"
+    DEPENDENCIES: sqlite-devel libgcrypt-devel itstool
+                  libsoup-devel gperf libarchive-devel json-glib-devel
+                  rest-devel libmediaart-devel libseccomp-devel
+                  gstreamer1-plugins-good gstreamer1-plugins-bad-free-extras
+                  python3-gobject-base dbus-daemon
+  before_script:
+    - *dependencies_procedure
+    - git clone https://gitlab.gnome.org/GNOME/tracker.git _tracker
+    - git clone https://gitlab.gnome.org/GNOME/tracker-miners.git _tracker-miners
+  script:
+    - cd _tracker
+    - meson . _build --prefix=/usr -Dman=false -Ddocs=false
     - ninja -C _build
     - ninja -C _build install
-    - meson test -C _build --suite=grilo-plugins
+    - cd ../_tracker-miners
+    - meson . _build --prefix=/usr -Dman=false -Dminer_rss=false
+    - ninja -C _build
+    - ninja -C _build install
+    - cd ..
+    - *build_procedure
   artifacts:
     name: meson-logs
     when: on_failure
