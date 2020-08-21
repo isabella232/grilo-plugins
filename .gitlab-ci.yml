@@ -48,3 +48,8 @@ build_stable:
     - ninja -C _build
     - ninja -C _build install
     - meson test -C _build --suite=grilo-plugins
+  artifacts:
+    name: meson-logs
+    when: on_failure
+    paths:
+      - _build/meson-logs
